@@ -6,6 +6,7 @@ This command dumps the distributed indices of specified OpenMDAO vectors.
 """
 
 import sys
+from six.moves import zip_longest
 
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.file_utils import _load_and_exec
