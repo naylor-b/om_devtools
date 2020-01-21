@@ -125,9 +125,7 @@ def _dist_idxs_exec(options, user_args):
 
 def _dist_idxs_setup():
     """
-    This is registered as an 'openmdao_commands' entry point.
-
-    It should return a tuple of the form (setup_parser_func, exec_func, help_string).
+    A command to list the global indices of specified OpenMDAO vectors.
     """
     return (
         _dist_idxs_setup_parser,
