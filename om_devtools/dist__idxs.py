@@ -80,7 +80,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         _dump(problem.model, stream)
 
 
-def _dump_dist_idxs_setup_parser(parser):
+def _dist_idxs_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao dump_idxs' command.
 
@@ -97,7 +97,7 @@ def _dump_dist_idxs_setup_parser(parser):
                         help='Name of vectors to show indices for.  Default is "nonlinear".')
 
 
-def _dump_dist_idxs_cmd(options, user_args):
+def _dist_idxs_exec(options, user_args):
     """
     Return the post_setup hook function for 'openmdao dump_idxs'.
 
