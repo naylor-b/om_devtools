@@ -3,7 +3,12 @@ from setuptools import setup
 
 setup_args = {
     'description': 'Some low level OpenMDAO develoment tools',
-    'entry_points': {'openmdao_commands': ['dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup']},
+    'entry_points': {
+        'openmdao_commands': [
+            'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
+            'compute_entry_points=om_devtools.compute_eps:_compute_entry_points_setup',
+        ]
+    },
     'install_requires': ['openmdao>=2.9.1'],
     'keywords': ['openmdao_commands'],
     'license': 'Apache License, Version 2.0',
