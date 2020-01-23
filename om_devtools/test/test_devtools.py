@@ -1,4 +1,3 @@
-"""Test the None."""
 
 import unittest
 import subprocess
