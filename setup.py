@@ -6,7 +6,6 @@ setup_args = {
     'entry_points': {
         'openmdao_commands': [
             'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
-            'compute_entry_points=om_devtools.compute_eps:_compute_entry_points_setup',
         ]
     },
     'install_requires': ['openmdao>=2.9.1'],

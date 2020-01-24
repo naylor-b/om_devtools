@@ -13,8 +13,9 @@ from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.mpi import MPI
 
 
-def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma: no cover
-    """Print out the distributed idxs for each variable in input and output vecs.
+def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout):
+    """
+    Print out the distributed idxs for each variable in input and output vecs.
 
     Output looks like this:
 
@@ -36,6 +37,8 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         The problem object that contains the model.
     vec_name : str
         Name of vector to dump (when there are multiple vectors due to parallel derivs)
+    full : bool
+        If True, include data for all indices instead of just offsets.
     stream : File-like
         Where dump output will go.
     """
@@ -43,9 +46,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
 
         sizes = g._var_sizes[vec_name]
         vnames = g._var_allprocs_abs_names
-        abs2meta = g._var_allprocs_abs2meta
 
-        idx = 0
         data = []
         nwid = 0
         iwid = 0
@@ -54,7 +55,10 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
             for ivar, vname in enumerate(vnames[type_]):
                 sz = sizes[type_][rank, ivar]
                 if sz > 0:
-                    data.append((vname, str(total)))
+                    if full:
+                        data.extend((vname, str(total + i)) for i in range(sz))
+                    else:
+                        data.append((vname, str(total)))
                 nwid = max(nwid, len(vname))
                 iwid = max(iwid, len(data[-1][1]))
                 total += sz
@@ -96,6 +100,8 @@ def _dist_idxs_setup_parser(parser):
                         help='Name of output file.  By default, output goes to stdout.')
     parser.add_argument('-v', '--vecname', action='store', default='nonlinear', dest='vecname',
                         help='Name of vectors to show indices for.  Default is "nonlinear".')
+    parser.add_argument('-f', '--full', action='store_true', dest='full',
+                        help="Show all indices instead of just offsets.")
 
 
 def _dist_idxs_exec(options, user_args):
@@ -115,7 +121,7 @@ def _dist_idxs_exec(options, user_args):
         out = open(options.outfile, 'w')
 
     def _dumpdist(prob):
-        dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
+        dump_dist_idxs(prob, vec_name=options.vecname, full=options.full, stream=out)
         exit()
 
     _register_hook('final_setup', 'Problem', post=_dumpdist)
