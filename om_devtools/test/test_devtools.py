@@ -1,15 +1,12 @@
 
 import unittest
-import subprocess
 import io
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.testing_utils import use_tempdirs
 
 
-@use_tempdirs
 class DumpIdxsTestCase(unittest.TestCase):
     def test_dump_idxs(self):
         p = om.Problem()
