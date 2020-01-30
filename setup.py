@@ -27,6 +27,7 @@ setup_args = {
     'entry_points': {
         'openmdao_commands': [
             'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
+            'memtop=om_devtools.memtop:_memtop_setup',
         ]
     },
     'license': 'Apache License, Version 2.0',
