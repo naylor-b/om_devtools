@@ -45,7 +45,7 @@ def display_top(snapshot, key_type='lineno', limit=10, file=sys.stdout):
 
 def _memtop_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao dump_idxs' command.
+    Set up the openmdao subparser for the 'openmdao memtop' command.
 
     Parameters
     ----------
@@ -61,7 +61,7 @@ def _memtop_setup_parser(parser):
 
 def _memtop_exec(options, user_args):
     """
-    Return the post_setup hook function for 'openmdao dump_idxs'.
+    Display the top memory usage.
 
     Parameters
     ----------
