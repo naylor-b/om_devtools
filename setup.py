@@ -25,7 +25,7 @@ setup_args = {
     ],
     'keywords': ['openmdao', 'openmdao_commands'],
     'entry_points': {
-        'openmdao_commands': [
+        'openmdao_command': [
             'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
             'memtop=om_devtools.memtop:_memtop_setup',
         ]
