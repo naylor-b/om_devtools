@@ -28,6 +28,7 @@ setup_args = {
         'openmdao_command': [
             'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
             'memtop=om_devtools.memtop:_memtop_setup',
+            'cprof=om_devtools.cprof:_cprof_setup',
         ]
     },
     'license': 'Apache License, Version 2.0',
@@ -36,7 +37,7 @@ setup_args = {
         'om_devtools.test'
     ],
     'install_requires': [
-        'openmdao>=2.9.1'
+        'openmdao>=2.10'
     ],
  }
 

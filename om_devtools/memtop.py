@@ -13,6 +13,8 @@ import tracemalloc
 from openmdao.utils.file_utils import _load_and_exec
 
 
+# the following function is taken from the python tracemalloc docs.
+
 def display_top(snapshot, key_type='lineno', limit=10, file=sys.stdout):
     snapshot = snapshot.filter_traces((
         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
