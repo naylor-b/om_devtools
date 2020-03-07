@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Source Heatmap</title>
+<style>
+    table {
+      font-family: arial, sans-serif;
+      border-collapse: collapse;
+      width: 100%;
+      border-spacing: 1px;
+    }
+    
+    td, th {
+      border: 1px solid #dddddd;
+      text-align: left;
+      margin: 1px 1px 1px 1px;
+    }
+    
+    pre {
+        margin: 1px 1px 1px 1px;
+    }
+    
+    /* tr:nth-child(even) {
+      background-color: #dddddd;
+    } */
+
+    {% for line in statprof_data['table'] %}
+        {% if line['hits'] %}
+           .ROW{{ line['hits'] }}  {background-color:{{ line['color'] }}; color:black;}
+        {% end %}
+    {% end %}
+
+</style>
+</head>
+<body>
+    <script type="text/javascript">
+
+        var data = {% raw json_encode(statprof_data) %};
+        var tabledata = data.table;
+        
+        // var title =  "Source File Heatmap for {{escape(statprof_data['srcfile'])}}";
+        // document.title = title;
+        // document.getElementById("tab_title").innerHTML = title
+        
+    
+    </script>
+        <h2>Source File Heatmap for {{escape(statprof_data['srcfile'])}}</h2>
+    <div id="statprof-table"></div>
+<table>
+    <thead>
+        <tr><th>Hits</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+        {% for line in statprof_data['table'] %}
+        {% if line['hits'] %}
+        <tr class="ROW{{ line['hits'] }}">
+        {% else %}
+        <tr>
+        {% end %}
+                <td>{{ line['hits'] }}</td>
+                <td><pre><code>{{ line['src'] }}</code></pre></td>
+            </tr>
+        {% end %}
+    </tbody>
+</table>
+
+</body>
+</html>
+

@@ -29,15 +29,25 @@ setup_args = {
             'dist_idxs=om_devtools.dist_idxs:_dist_idxs_setup',
             'memtop=om_devtools.memtop:_memtop_setup',
             'cprof=om_devtools.cprof:_cprof_setup',
+            'statprof=om_devtools.statprof.viewstatprof:_statprof_setup',
         ]
     },
     'license': 'Apache License, Version 2.0',
     'packages': [
         'om_devtools',
+        'om_devtools.statprof'
         'om_devtools.test'
     ],
+    package_data={
+        'om_devtools.statprof': [
+            'static/lib/*.js',
+            'static/lib/*.css',
+            'templates/*.html',
+        ],
+    },
     'install_requires': [
-        'openmdao>=2.10'
+        'openmdao>=2.10',
+        'tornado',
     ],
  }
 
