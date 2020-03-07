@@ -15,19 +15,20 @@ import pickle
 from six import iteritems
 
 import numpy as np
+import tornado.web
+import tornado.ioloop
 
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.functionlocator import FunctionLocator
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
-import tornado.web
-import tornado.ioloop
+
+from om_devtools.functionlocator import FunctionLocator
 
 try:
     import faulthandler
