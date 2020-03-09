@@ -35,10 +35,10 @@ setup_args = {
     'license': 'Apache License, Version 2.0',
     'packages': [
         'om_devtools',
-        'om_devtools.statprof'
-        'om_devtools.test'
+        'om_devtools.statprof',
+        'om_devtools.test',
     ],
-    package_data={
+    'package_data': {
         'om_devtools.statprof': [
             'static/lib/*.js',
             'static/lib/*.css',
