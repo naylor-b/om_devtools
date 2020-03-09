@@ -31,12 +31,6 @@ from openmdao.solvers.solver import Solver
 
 from om_devtools.functionlocator import FunctionLocator
 
-try:
-    import faulthandler
-    faulthandler.enable()
-except ImportError:
-    pass
-
 
 def launch_browser(port):
     time.sleep(1)
