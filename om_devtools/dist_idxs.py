@@ -46,6 +46,16 @@ def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout)
 
         sizes = g._var_sizes[vec_name]
         vnames = g._var_allprocs_abs_names
+        abs2idx = g._var_allprocs_abs2idx[vec_name]
+
+        try:
+            if vec_name == 'nonlinear' and type_ == 'input' and g._inputs._nocopy:
+                nocopy = g._inputs._nocopy
+                osizes = g._var_sizes[vec_name]['output']
+            else:
+                nocopy = {}
+        except AttributeError:
+            nocopy = {}
 
         data = []
         nwid = 0
@@ -53,13 +63,18 @@ def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout)
         total = 0
         for rank in range(g.comm.size):
             for ivar, vname in enumerate(vnames[type_]):
-                sz = sizes[type_][rank, ivar]
+                if vname in nocopy:
+                    sz = osizes[rank, abs2idx[nocopy[vname]]]
+                    suffix = '*'
+                else:
+                    sz = sizes[type_][rank, ivar]
+                    suffix = ''
                 if sz > 0:
                     if full:
-                        data.extend((vname, str(total + i)) for i in range(sz))
+                        data.extend((vname + suffix, str(total + i)) for i in range(sz))
                     else:
-                        data.append((vname, str(total)))
-                nwid = max(nwid, len(vname))
+                        data.append((vname + suffix, str(total)))
+                nwid = max(nwid, len(vname + suffix))
                 iwid = max(iwid, len(data[-1][1]))
                 total += sz
 
