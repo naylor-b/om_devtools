@@ -11,6 +11,7 @@ from six.moves import zip_longest
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.mpi import MPI
+from openmdao.utils.general_utils import ignore_errors
 
 
 def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout):
@@ -64,7 +65,7 @@ def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout)
         for rank in range(g.comm.size):
             for ivar, vname in enumerate(vnames[type_]):
                 if vname in nocopy:
-                    sz = osizes[rank, abs2idx[nocopy[vname]]]
+                    sz = osizes[rank, abs2idx[nocopy[vname][0]]]
                     suffix = '*'
                 else:
                     sz = sizes[type_][rank, ivar]
@@ -141,6 +142,7 @@ def _dist_idxs_exec(options, user_args):
 
     _register_hook('final_setup', 'Problem', post=_dumpdist)
 
+    ignore_errors(True)
     _load_and_exec(options.file[0], user_args)
 
 
