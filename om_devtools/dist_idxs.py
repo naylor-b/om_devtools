@@ -11,7 +11,11 @@ from six.moves import zip_longest
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.mpi import MPI
-from openmdao.utils.general_utils import ignore_errors
+try:
+    from openmdao.utils.general_utils import ignore_errors
+except ImportError:
+    def ignore_errors(flag):
+        pass
 
 
 def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout):
