@@ -41,7 +41,7 @@ def _cprof_exec(options, user_args):
 
 def _cprof_setup():
     """
-    A command to display source lines that allocate the most memory.
+    A command to run the c profiler.
     """
     return (
         _cprof_setup_parser,
