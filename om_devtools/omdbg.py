@@ -2,14 +2,45 @@
 import os
 import sys
 import pdb
+import tornado.web
+import tornado.ioloop
+
+import openmdao.core.group
+from openmdao.core.group import Group
+
+
+class _DBGInput(object):
+    def __init__(self):
+        # print("Group file:",openmdao.core.group.__file__)
+        # print("line:", Group._solve_nonlinear.__code__.co_firstlineno)
+        self._cmds = [
+            's',
+            f'b {openmdao.core.problem.__file__}: 835',
+            'c',
+        ]
+        self._cmdcount = 0
+
+    def readline(self, *args, **kwargs):
+        if self._cmdcount < len(self._cmds):
+            idx = self._cmdcount
+            self._cmdcount += 1
+            return self._cmds[idx]
+        else:
+            return input('Enter a command: ')
+
 
 class OMdbg(pdb.Pdb):
-    intro = 'Welcome to the OpenMDAO debugger.   Type help or ? to list commands.\n'
+    intro = ''
     prompt = '(openmdao) '
     file = None
+    use_rawinput = False  # we're using our own stdin
+
+    def __init__(self, *args, **kwargs):
+        kwargs['stdin'] = _DBGInput()
+        super(OMdbg, self).__init__(*args, **kwargs)
 
     # # ----- basic commands -----
-    # def do_forward(self, arg):
+    # def do_forward(self, arg)
     #     'Move the turtle forward by the specified distance:  FORWARD 10'
     #     forward(*parse(arg))
     # def do_bye(self, arg):
@@ -18,7 +49,6 @@ class OMdbg(pdb.Pdb):
     #     self.close()
     #     bye()
     #     return True
-
 
 def _omdbg_setup_parser(parser):
     """

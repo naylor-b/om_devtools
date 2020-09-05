@@ -30,24 +30,7 @@ from openmdao.core.driver import Driver
 from openmdao.solvers.solver import Solver
 
 from om_devtools.functionlocator import FunctionLocator
-
-
-def launch_browser(port):
-    time.sleep(1)
-    for browser in ['chrome', 'firefox', 'chromium', 'safari']:
-        try:
-            webbrowser.get(browser).open('http://localhost:%s' % port)
-        except:
-            pass
-        else:
-            break
-
-
-def startThread(fn):
-    thread = threading.Thread(target=fn)
-    thread.setDaemon(True)
-    thread.start()
-    return thread
+from om_devtools.utils import launch_browser, start_thread
 
 
 _cmap = ["#ffffcc", "#fffecb", "#fffec9", "#fffdc8", "#fffdc6", "#fffcc5", "#fffcc4", "#fffbc2", "#fffac1",
@@ -266,8 +249,8 @@ def view_statprof(options, pyfile, raw_stat_file):
 
     print("starting server on port %d" % port)
 
-    serve_thread  = startThread(tornado.ioloop.IOLoop.current().start)
-    launch_thread = startThread(lambda: launch_browser(port))
+    serve_thread  = start_thread(tornado.ioloop.IOLoop.current().start)
+    launch_thread = start_thread(lambda: launch_browser(port))
 
     while serve_thread.isAlive():
         serve_thread.join(timeout=1)
