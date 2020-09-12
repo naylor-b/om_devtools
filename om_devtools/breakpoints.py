@@ -3,6 +3,14 @@ import sys
 import ast
 
 
+class BreakManager(object):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return True
+
+
 class FuncInfo(object):
     def __init__(self, filepath, funcpath, lineno):
         self.filepath = filepath

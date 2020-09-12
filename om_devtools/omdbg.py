@@ -9,7 +9,11 @@ import inspect
 import openmdao.core.group
 from openmdao.core.problem import Problem
 from openmdao.core.system import System
-from om_devtools.breakpoints import BreakpointLocator
+from om_devtools.breakpoints import BreakpointLocator, BreakManager
+
+
+bm = BreakManager()
+
 
 class _DBGInput(object):
     def __init__(self):
@@ -31,6 +35,7 @@ class _DBGInput(object):
             idx = self._cmdcount
             self._cmdcount += 1
             return self._cmds[idx]
+        elif
         else:
             return input('Enter a command: ')
 
