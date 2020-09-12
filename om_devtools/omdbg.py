@@ -2,23 +2,29 @@
 import os
 import sys
 import pdb
-import tornado.web
-import tornado.ioloop
+import inspect
+# import tornado.web
+# import tornado.ioloop
 
 import openmdao.core.group
-from openmdao.core.group import Group
-
+from openmdao.core.problem import Problem
+from openmdao.core.system import System
+from om_devtools.breakpoints import BreakpointLocator
 
 class _DBGInput(object):
     def __init__(self):
-        # print("Group file:",openmdao.core.group.__file__)
-        # print("line:", Group._solve_nonlinear.__code__.co_firstlineno)
+        self.bploc = bploc = BreakpointLocator()
+        bploc.process_class(System)
+        bploc.process_class(Problem)
+        p = bploc.func_info['Problem.__init__']
+        s = bploc.func_info['System.__init__']
         self._cmds = [
-            's',
-            f'b {openmdao.core.problem.__file__}: 835',
-            'c',
+            f'b {p.filepath}: {p.start}',
+            f'b {s.filepath}: {s.start}',
+            'c'
         ]
         self._cmdcount = 0
+        # pprint.pprint(bploc.funct_ranges)
 
     def readline(self, *args, **kwargs):
         if self._cmdcount < len(self._cmds):
@@ -30,8 +36,6 @@ class _DBGInput(object):
 
 
 class OMdbg(pdb.Pdb):
-    intro = ''
-    prompt = '(openmdao) '
     file = None
     use_rawinput = False  # we're using our own stdin
 
@@ -97,6 +101,8 @@ def _omdbg_exec(options, user_args):
     }
 
     om = OMdbg()
+    om.intro = '\nWelcome to the OpenMDAO debugger\n'
+    om.prompt='<openmdao> '
     om.run(code, globals=globals_dict)
 
 
