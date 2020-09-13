@@ -1,13 +1,33 @@
 
 import sys
 import ast
+import pprint
 
 
 class BreakManager(object):
     def __init__(self):
-        pass
+        self.fdict = {
+            '@parse_src': self.parse_src,
+            '@get_pathname': self.get_pathname,
+        }
 
-    def __call__(self, *args, **kwargs):
+    def do_break_action(self, cond, frameinfo, frame_globals, frame_locals):
+        return self.fdict[cond](frameinfo, frame_globals, frame_locals)
+
+    def parse_src(self, frameinfo, frame_globals, frame_locals):
+        """
+        After breaking in System.__init__, get file of class and parse the ast for breakpoint locs.
+        """
+        mod = frame_locals['self'].__class__.__module__
+        fpath = sys.modules[mod].__file__
+        print(f"parse_src: {fpath}")
+        return True
+
+    def get_pathname(self, frameinfo, frame_globals, frame_locals):
+        """
+        After breaking in System._setup_procs, get instance pathname.
+        """
+        print(f"get_pathname: {frame_locals['pathname']}")
         return True
 
 
@@ -37,15 +57,6 @@ class BreakpointLocator(ast.NodeVisitor):
         self.fstack = []
         self.seen = set()
         self.filepath = None
-
-    # def generic_visit(self, node):
-    #     if self.fstack:
-    #         if hasattr(node, 'lineno'):
-    #             # update the last line of every funct on the stack
-    #             for f in self.fstack:
-    #                 f[1] = node.lineno
-
-    #     super(BreakpointLocator, self).generic_visit(node)
 
     def visit_ClassDef(self, node):
         self.stack.append(node.name)

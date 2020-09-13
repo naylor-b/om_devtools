@@ -3,8 +3,7 @@ import os
 import sys
 import pdb
 import inspect
-# import tornado.web
-# import tornado.ioloop
+from bdb import effective, Breakpoint, checkfuncname
 
 import openmdao.core.group
 from openmdao.core.problem import Problem
@@ -12,30 +11,23 @@ from openmdao.core.system import System
 from om_devtools.breakpoints import BreakpointLocator, BreakManager
 
 
-bm = BreakManager()
-
-
 class _DBGInput(object):
-    def __init__(self):
+    def __init__(self, brkmanager):
+        self.brkmanager = brkmanager
         self.bploc = bploc = BreakpointLocator()
         bploc.process_class(System)
         bploc.process_class(Problem)
-        p = bploc.func_info['Problem.__init__']
-        s = bploc.func_info['System.__init__']
+        sinit = bploc.func_info['System.__init__']
+        setup_procs = bploc.func_info['System._setup_procs']
         self._cmds = [
-            f'b {p.filepath}: {p.start}',
-            f'b {s.filepath}: {s.start}',
-            'c'
+            'c',
+            f'b {sinit.filepath}: {sinit.start}, @parse_src',
+            f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
         ]
-        self._cmdcount = 0
-        # pprint.pprint(bploc.funct_ranges)
 
     def readline(self, *args, **kwargs):
-        if self._cmdcount < len(self._cmds):
-            idx = self._cmdcount
-            self._cmdcount += 1
-            return self._cmds[idx]
-        elif
+        if self._cmds:
+            return self._cmds.pop()
         else:
             return input('Enter a command: ')
 
@@ -45,7 +37,8 @@ class OMdbg(pdb.Pdb):
     use_rawinput = False  # we're using our own stdin
 
     def __init__(self, *args, **kwargs):
-        kwargs['stdin'] = _DBGInput()
+        self.brkmanager = BreakManager()
+        kwargs['stdin'] = _DBGInput(self.brkmanager)
         super(OMdbg, self).__init__(*args, **kwargs)
 
     # # ----- basic commands -----
@@ -58,6 +51,86 @@ class OMdbg(pdb.Pdb):
     #     self.close()
     #     bye()
     #     return True
+
+    def break_here(self, frame):
+        """Return True if there is an effective breakpoint for this line.
+
+        Check for line or function breakpoint and if in effect.
+        Delete temporary breakpoints if effective() says to.
+        """
+        filename = self.canonic(frame.f_code.co_filename)
+        if filename not in self.breaks:
+            return False
+        lineno = frame.f_lineno
+        if lineno not in self.breaks[filename]:
+            # The line itself has no breakpoint, but maybe the line is the
+            # first line of a function with breakpoint set by function name.
+            lineno = frame.f_code.co_firstlineno
+            if lineno not in self.breaks[filename]:
+                return False
+
+        # flag says ok to delete temp. bp
+        (bp, flag) = self.my_effective(filename, lineno, frame)
+        if bp:
+            self.currentbp = bp.number
+            if (flag and bp.temporary):
+                self.do_clear(str(bp.number))
+            return True
+        else:
+            return False
+
+    # Determines if there is an effective (active) breakpoint at this
+    # line of code.  Returns breakpoint number or 0 if none
+    def my_effective(self, file, line, frame):
+        """Determine which breakpoint for this file:line is to be acted upon.
+
+        Called only if we know there is a breakpoint at this location.  Return
+        the breakpoint that was triggered and a boolean that indicates if it is
+        ok to delete a temporary breakpoint.  Return (None, None) if there is no
+        matching breakpoint.
+        """
+        for b in Breakpoint.bplist[file, line]:
+            if not b.enabled:
+                continue
+            if not checkfuncname(b, frame):
+                continue
+            # Count every hit when bp is enabled
+            b.hits += 1
+            if not b.cond:
+                # If unconditional, and ignoring go on to next, else break
+                if b.ignore > 0:
+                    b.ignore -= 1
+                    continue
+                else:
+                    # breakpoint and marker that it's ok to delete if temporary
+                    return (b, True)
+            else:
+                # Conditional bp.
+                # Ignore count applies only to those bpt hits where the
+                # condition evaluates to true.
+                try:
+                    if b.cond.startswith('@'):
+                        val = self.brkmanager.do_break_action(b.cond, inspect.getframeinfo(frame),
+                                                              frame.f_globals, frame.f_locals)
+                    else:
+                        val = eval(b.cond, frame.f_globals, frame.f_locals)
+                    if val:
+                        if b.ignore > 0:
+                            b.ignore -= 1
+                            # continue
+                        else:
+                            return (b, True)
+                    # else:
+                    #   continue
+                except:
+                    # if eval fails, most conservative thing is to stop on
+                    # breakpoint regardless of ignore count.  Don't delete
+                    # temporary, as another hint to user.
+                    return (b, False)
+        return (None, None)
+
+
+# ---------------- command line tool setup -------------------
 
 def _omdbg_setup_parser(parser):
     """
