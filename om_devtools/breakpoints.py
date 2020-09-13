@@ -1,33 +1,53 @@
 
 import sys
 import ast
-import pprint
+import inspect
+from collections import defaultdict
+
+from openmdao.core.problem import Problem
+from openmdao.core.system import System
 
 
 class BreakManager(object):
     def __init__(self):
         self.fdict = {
-            '@parse_src': self.parse_src,
+            '@parse_system_src': self.parse_system_src,
             '@get_pathname': self.get_pathname,
         }
+        self.bplocator = bplocator = BreakpointLocator()
+        bplocator.process_class(System)
+        bplocator.process_class(Problem)
+        sinit = bplocator.func_info['System.__init__']
+        setup_procs = bplocator.func_info['System._setup_procs']
+        self._cmds = [
+            f'b {sinit.filepath}: {sinit.start}, @parse_system_src',
+            f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
+        ]
 
-    def do_break_action(self, cond, frameinfo, frame_globals, frame_locals):
-        return self.fdict[cond](frameinfo, frame_globals, frame_locals)
+    def has_commands(self):
+        return len(self._cmds) > 0
 
-    def parse_src(self, frameinfo, frame_globals, frame_locals):
+    def next_command(self):
+        return self._cmds.pop()
+
+    def do_break_action(self, bp, frameinfo, frame_globals, frame_locals):
+        return self.fdict[bp.cond](frameinfo, frame_globals, frame_locals)
+
+    def parse_system_src(self, frameinfo, frame_globals, frame_locals):
         """
         After breaking in System.__init__, get file of class and parse the ast for breakpoint locs.
         """
-        mod = frame_locals['self'].__class__.__module__
-        fpath = sys.modules[mod].__file__
-        print(f"parse_src: {fpath}")
+        for klass in inspect.getmro(frame_locals['self'].__class__):
+            self.bplocator.process_class(klass)
+            if klass is System:
+                break
         return True
 
     def get_pathname(self, frameinfo, frame_globals, frame_locals):
         """
         After breaking in System._setup_procs, get instance pathname.
         """
-        print(f"get_pathname: {frame_locals['pathname']}")
+        self.bplocator.add_instance(frame_locals['pathname'], frame_locals['self'].__class__)
         return True
 
 
@@ -56,6 +76,8 @@ class BreakpointLocator(ast.NodeVisitor):
         self.stack = []
         self.fstack = []
         self.seen = set()
+        self.inst2class = {}
+        self.class2inst = defaultdict(list)
         self.filepath = None
 
     def visit_ClassDef(self, node):
@@ -76,10 +98,8 @@ class BreakpointLocator(ast.NodeVisitor):
             if start is None:
                 # skip docstring
                 if isinstance(bnode, ast.Expr) and isinstance(bnode.value, ast.Str):
-                    #print("Expr: ", bnode.value.n, bnode.value.s)
                     continue
                 start = finfo.start = bnode.lineno
-                # print(fpath, "start: ", bnode.lineno, type(bnode).__name__)
             self.visit(bnode)
         finfo.end = bnode.lineno
 
@@ -92,11 +112,15 @@ class BreakpointLocator(ast.NodeVisitor):
     def visit_Raise(self, node):
         self.fstack[-1].raises.append(node.lineno)
 
+    def add_instance(self, pathname, klass):
+        self.inst2class[pathname] = klass
+        self.class2inst[klass].append(pathname)
+
     def process_class(self, klass):
         try:
             mod = sys.modules[klass.__module__]
         except:
-            print(f"skipping class {klass.__name__}")
+            print(f"skipping class {klass.__name__}. Can't find module.")
 
         self.process_file(mod.__file__)
 
@@ -123,10 +147,3 @@ class BreakpointLocator(ast.NodeVisitor):
             return self.funct_ranges[lineno]
         except KeyError:
             return (None, None)
-
-
-if __name__ == '__main__':
-    import pprint
-    floc = FunctionLocator()
-    floc.process_file(sys.argv[1])
-    pprint.pprint(floc.funct_ranges)

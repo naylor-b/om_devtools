@@ -5,31 +5,18 @@ import pdb
 import inspect
 from bdb import effective, Breakpoint, checkfuncname
 
-import openmdao.core.group
-from openmdao.core.problem import Problem
-from openmdao.core.system import System
 from om_devtools.breakpoints import BreakpointLocator, BreakManager
 
 
 class _DBGInput(object):
     def __init__(self, brkmanager):
         self.brkmanager = brkmanager
-        self.bploc = bploc = BreakpointLocator()
-        bploc.process_class(System)
-        bploc.process_class(Problem)
-        sinit = bploc.func_info['System.__init__']
-        setup_procs = bploc.func_info['System._setup_procs']
-        self._cmds = [
-            'c',
-            f'b {sinit.filepath}: {sinit.start}, @parse_src',
-            f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
-        ]
 
     def readline(self, *args, **kwargs):
-        if self._cmds:
-            return self._cmds.pop()
+        if self.brkmanager.has_commands():
+            return self.brkmanager.next_command()
         else:
-            return input('Enter a command: ')
+            return 'c'  # input('Enter a command: ')
 
 
 class OMdbg(pdb.Pdb):
@@ -110,7 +97,7 @@ class OMdbg(pdb.Pdb):
                 # condition evaluates to true.
                 try:
                     if b.cond.startswith('@'):
-                        val = self.brkmanager.do_break_action(b.cond, inspect.getframeinfo(frame),
+                        val = self.brkmanager.do_break_action(b, inspect.getframeinfo(frame),
                                                               frame.f_globals, frame.f_locals)
                     else:
                         val = eval(b.cond, frame.f_globals, frame.f_locals)
@@ -179,8 +166,7 @@ def _omdbg_exec(options, user_args):
     }
 
     om = OMdbg()
-    om.intro = '\nWelcome to the OpenMDAO debugger\n'
-    om.prompt='<openmdao> '
+    om.prompt='<omdbg> '
     om.run(code, globals=globals_dict)
 
 
