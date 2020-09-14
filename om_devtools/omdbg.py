@@ -19,7 +19,7 @@ class _DBGInput(object):
         if self.brkmanager.has_commands():
             return self.brkmanager.next_command()
         else:
-            return 'c'  # input('Enter a command: ')
+            return input('Enter a command: ')
 
 
 class OMdbg(pdb.Pdb):
@@ -44,6 +44,9 @@ class OMdbg(pdb.Pdb):
     #     self.close()
     #     bye()
     #     return True
+
+    def message(self, msg):
+        print(msg, file=self.stdout)
 
     def break_here(self, frame):
         """Return True if there is an effective breakpoint for this line.
