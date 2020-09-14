@@ -2,33 +2,61 @@
 import sys
 import ast
 import inspect
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from openmdao.core.problem import Problem
 from openmdao.core.system import System
 
 
 class BreakManager(object):
-    def __init__(self):
+    def __init__(self, model):
+        assert model.pathname == ''
         self.fdict = {
             '@parse_system_src': self.parse_system_src,
             '@get_pathname': self.get_pathname,
         }
         self.bplocator = bplocator = BreakpointLocator()
-        bplocator.process_class(System)
         bplocator.process_class(Problem)
-        sinit = bplocator.func_info['System.__init__']
-        setup_procs = bplocator.func_info['System._setup_procs']
-        self._cmds = [
-            f'b {sinit.filepath}: {sinit.start}, @parse_system_src',
-            f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
-        ]
+        seen = set()
+        for s in model.system_iter(recurse=True, include_self=True):
+            if s.__class__ not in seen:
+                bplocator.process_class(s.__class__)
+                seen.add(s.__class__)
+            bplocator.add_instance(s.pathname, s.__class__)
+
+        # sinit = bplocator.func_info['System.__init__']
+        # setup_procs = bplocator.func_info['System._setup_procs']
+        self._cmds = deque([])
+        #     f'b {sinit.filepath}: {sinit.start}, @parse_system_src',
+        #     'commands',
+        #     'silent',
+        #     'end',
+        #     f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
+        #     'commands',
+        #     'silent',
+        #     'forward foo:bar:baz',
+        #     'end',
+        # ])
+        self.add_command('stopin circuit.R1.compute')
+
+    def add_command(self, cmd):
+        self._cmds.append(cmd)
 
     def has_commands(self):
         return len(self._cmds) > 0
 
     def next_command(self):
-        return self._cmds.pop()
+        return self._cmds.popleft()
+
+    def stop_in(self, arg):
+        # TODO: add parsing for , condition
+        if '.' in arg:
+            opath, func = arg.rsplit('.', 1)
+        # first map instance name to class
+        klass = self.bplocator.inst2class[opath]
+        # get start line of method from bplocator
+        info = self.bplocator.func_info['.'.join((klass.__name__, func))]
+        self.add_command(f"b {info.filepath}: {info.start}")
 
     def do_break_action(self, bp, frameinfo, frame_globals, frame_locals):
         return self.fdict[bp.cond](frameinfo, frame_globals, frame_locals)
