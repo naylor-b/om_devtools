@@ -63,12 +63,10 @@ class BreakManager(object):
                 return
         # get start line of method from bplocator
         for class_ in inspect.getmro(klass):
-            print("CLASS:", class_.__name__)
             try:
                 info = self.bplocator.func_info['.'.join((class_.__name__, func))]
                 break
             except KeyError:
-                print("FAIL")
                 continue
         else:
             print(f"Can't find function '{'.'.join((class_.__name__, func))}.")
@@ -76,10 +74,8 @@ class BreakManager(object):
 
         if instance is None:
             # add a break for all instances of the class
-            print("adding class break")
             self.add_command(f"b {info.filepath}: {info.start}, self.__class__.__name__=='{parent}'")
         else:
-            print("adding inst break", instance)
             # add conditional break where pathname matches the given instance
             self.add_command(f"b {info.filepath}: {info.start}, self.pathname=='{instance}'")
 
