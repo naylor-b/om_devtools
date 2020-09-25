@@ -2,6 +2,8 @@
 import sys
 import ast
 import inspect
+import weakref
+from fnmatch import fnmatchcase
 from collections import defaultdict, deque
 
 from openmdao.core.problem import Problem
@@ -9,35 +11,25 @@ from openmdao.core.system import System
 
 
 class BreakManager(object):
-    def __init__(self, model):
-        assert model.pathname == ''
-        self.fdict = {
-            '@parse_system_src': self.parse_system_src,
-            '@get_pathname': self.get_pathname,
-        }
+    def __init__(self, problem):
+        self._problem = weakref.ref(problem)
+        # self.fdict = {
+        #     '@parse_system_src': self.parse_system_src,
+        #     '@get_pathname': self.get_pathname,
+        # }
         self.bplocator = bplocator = BreakpointLocator()
-        bplocator.process_class(Problem)
-        seen = set()
-        for s in model.system_iter(recurse=True, include_self=True):
-            if s.__class__ not in seen:
-                bplocator.process_class(s.__class__)
-                seen.add(s.__class__)
-            bplocator.add_instance(s.pathname, s.__class__)
+        bplocator.process_class(problem.__class__)
 
-        # sinit = bplocator.func_info['System.__init__']
-        # setup_procs = bplocator.func_info['System._setup_procs']
         self._cmds = deque([])
-        #     f'b {sinit.filepath}: {sinit.start}, @parse_system_src',
-        #     'commands',
-        #     'silent',
-        #     'end',
-        #     f'b {setup_procs.filepath}: {setup_procs.start}, @get_pathname',
-        #     'commands',
-        #     'silent',
-        #     'forward foo:bar:baz',
-        #     'end',
-        # ])
-        self.add_command('stopin circuit.R1.compute')
+        # self.add_command('stopin circuit.R1.compute')
+
+    def setup(self):
+        seen = set()
+        for s in self._problem().model.system_iter(recurse=True, include_self=True):
+            if s.__class__ not in seen:
+                self.bplocator.process_class(s.__class__)
+                seen.add(s.__class__)
+            self.bplocator.add_instance(s.pathname, s.__class__)
 
     def add_command(self, cmd):
         self._cmds.append(cmd)
@@ -48,35 +40,60 @@ class BreakManager(object):
     def next_command(self):
         return self._cmds.popleft()
 
-    def stop_in(self, arg):
+    def bfunc(self, arg):  # break in func
         # TODO: add parsing for , condition
+        instance = None
         if '.' in arg:
-            opath, func = arg.rsplit('.', 1)
+            parent, func = arg.rsplit('.', 1)
+        else:
+            func = arg
+            parent = None
+
         # first map instance name to class
-        klass = self.bplocator.inst2class[opath]
+        try:
+            klass = self.bplocator.inst2class[parent]
+            instance = parent
+        except KeyError:
+            # didn't find instance, could be a class
+            if parent in self.bplocator.cname2inst:
+                inames = self.bplocator.cname2inst[parent]
+                klass = self.bplocator.inst2class[inames[0]]
+            else:
+                print(f"Can't find function '{arg}.")
+                return
         # get start line of method from bplocator
-        info = self.bplocator.func_info['.'.join((klass.__name__, func))]
-        self.add_command(f"b {info.filepath}: {info.start}")
-
-    def do_break_action(self, bp, frameinfo, frame_globals, frame_locals):
-        return self.fdict[bp.cond](frameinfo, frame_globals, frame_locals)
-
-    def parse_system_src(self, frameinfo, frame_globals, frame_locals):
-        """
-        After breaking in System.__init__, get file of class and parse the ast for breakpoint locs.
-        """
-        for klass in inspect.getmro(frame_locals['self'].__class__):
-            self.bplocator.process_class(klass)
-            if klass is System:
+        for class_ in inspect.getmro(klass):
+            print("CLASS:", class_.__name__)
+            try:
+                info = self.bplocator.func_info['.'.join((class_.__name__, func))]
                 break
-        return True
+            except KeyError:
+                print("FAIL")
+                continue
+        else:
+            print(f"Can't find function '{'.'.join((class_.__name__, func))}.")
+            return
 
-    def get_pathname(self, frameinfo, frame_globals, frame_locals):
-        """
-        After breaking in System._setup_procs, get instance pathname.
-        """
-        self.bplocator.add_instance(frame_locals['pathname'], frame_locals['self'].__class__)
-        return True
+        if instance is None:
+            # add a break for all instances of the class
+            print("adding class break")
+            self.add_command(f"b {info.filepath}: {info.start}, self.__class__.__name__=='{parent}'")
+        else:
+            print("adding inst break", instance)
+            # add conditional break where pathname matches the given instance
+            self.add_command(f"b {info.filepath}: {info.start}, self.pathname=='{instance}'")
+
+    def dumpf(self, arg):
+        if arg:
+            for f in self.bplocator.func_info:
+                if fnmatchcase(f, arg):
+                    print(f)
+        else:
+            for f in self.bplocator.func_info:
+                print(f)
+
+    def dumpinst(self, arg):
+        pass
 
 
 class FuncInfo(object):
@@ -105,7 +122,7 @@ class BreakpointLocator(ast.NodeVisitor):
         self.fstack = []
         self.seen = set()
         self.inst2class = {}
-        self.class2inst = defaultdict(list)
+        self.cname2inst = defaultdict(list)
         self.filepath = None
 
     def visit_ClassDef(self, node):
@@ -142,7 +159,7 @@ class BreakpointLocator(ast.NodeVisitor):
 
     def add_instance(self, pathname, klass):
         self.inst2class[pathname] = klass
-        self.class2inst[klass].append(pathname)
+        self.cname2inst[klass.__name__].append(pathname)
 
     def process_class(self, klass):
         try:
