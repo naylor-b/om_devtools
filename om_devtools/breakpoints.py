@@ -4,31 +4,45 @@ import ast
 import inspect
 import weakref
 from fnmatch import fnmatchcase
-from collections import defaultdict, deque
+from collections import defaultdict, deque, namedtuple
 
 from openmdao.core.problem import Problem
 from openmdao.core.system import System
 
 
+class BreakInfo(object):
+    __slots__ = ['id', 'active', 'fpath', 'line', 'conditions']
+
+    def __init__(self, ident, fpath, line, conditions):
+        self.id = ident
+        self.active = True
+        self.fpath = fpath
+        self.line = line
+        self.conditions = conditions[:]
+
+    def __iter__(self):
+        yield self.id
+        yield self.active
+        yield self.fpath
+        yield self.line
+        yield self.conditions
+
+
 class BreakManager(object):
     def __init__(self, problem):
         self._problem = weakref.ref(problem)
-        # self.fdict = {
-        #     '@parse_system_src': self.parse_system_src,
-        #     '@get_pathname': self.get_pathname,
-        # }
         self.bplocator = bplocator = BreakpointLocator()
         bplocator.process_class(problem.__class__)
-
+        self._breaks = []
         self._cmds = deque([])
-        # self.add_command('stopin circuit.R1.compute')
 
     def setup(self):
-        seen = set()
+        seen = set([object])
         for s in self._problem().model.system_iter(recurse=True, include_self=True):
-            if s.__class__ not in seen:
-                self.bplocator.process_class(s.__class__)
-                seen.add(s.__class__)
+            for c in inspect.getmro(s.__class__):
+                if c not in seen:
+                    self.bplocator.process_class(c)
+                    seen.add(c)
             self.bplocator.add_instance(s.pathname, s.__class__)
 
     def add_command(self, cmd):
@@ -40,7 +54,7 @@ class BreakManager(object):
     def next_command(self):
         return self._cmds.popleft()
 
-    def bfunc(self, arg):  # break in func
+    def find_break(self, arg):
         # TODO: add parsing for , condition
         instance = None
         if '.' in arg:
@@ -55,12 +69,11 @@ class BreakManager(object):
             instance = parent
         except KeyError:
             # didn't find instance, could be a class
-            if parent in self.bplocator.cname2inst:
-                inames = self.bplocator.cname2inst[parent]
-                klass = self.bplocator.inst2class[inames[0]]
+            if parent in self.bplocator.classes:
+                klass = self.bplocator.classes[parent]
             else:
                 print(f"Can't find function '{arg}.")
-                return
+                return None, None, None
         # get start line of method from bplocator
         for class_ in inspect.getmro(klass):
             try:
@@ -70,16 +83,37 @@ class BreakManager(object):
                 continue
         else:
             print(f"Can't find function '{'.'.join((class_.__name__, func))}.")
-            return
+            return None, None, None
 
         if instance is None:
-            # add a break for all instances of the class
-            self.add_command(f"b {info.filepath}: {info.start}, self.__class__.__name__=='{parent}'")
+            # Add a break for all instances of the class
+            if klass is class_:
+                conds = ()
+            else:
+                # Add a condition for the specific class since the actual
+                # method is coming from a base class.
+                conds = (f"({klass.__name__} in self.__class__.__mro__)",)
         else:
-            # add conditional break where pathname matches the given instance
-            self.add_command(f"b {info.filepath}: {info.start}, self.pathname=='{instance}'")
+            # Add conditional break where pathname matches the given instance
+            conds = (f"(self.pathname=='{instance}')",)
 
-    def dumpf(self, arg):
+        return info.filepath, info.start, conds
+
+    def bfunc(self, arg):  # break in func
+        fpath, start, conds = self.find_break(arg)
+        if fpath is None:
+            return
+
+        self._breaks.append(BreakInfo(len(self._breaks) + 1, fpath, start, conds))
+        if conds:
+            self.add_command(f"break {fpath}: {start}, {' or '.join(conds)}")
+        else:
+            self.add_command(f"break {fpath}: {start}")
+
+    def fdump(self, arg):
+        """
+        Dump known functions, with optional glob pattern filtering.
+        """
         if arg:
             for f in self.bplocator.func_info:
                 if fnmatchcase(f, arg):
@@ -88,8 +122,17 @@ class BreakManager(object):
             for f in self.bplocator.func_info:
                 print(f)
 
-    def dumpinst(self, arg):
-        pass
+    def idump(self, arg):
+        """
+        Dump known instance paths, with optional glob pattern filtering.
+        """
+        if arg:
+            for i in self.bplocator.inst2class:
+                if fnmatchcase(i, arg):
+                    print(i)
+        else:
+            for i in self.bplocator.inst2class:
+                print(i)
 
 
 class FuncInfo(object):
@@ -119,6 +162,7 @@ class BreakpointLocator(ast.NodeVisitor):
         self.seen = set()
         self.inst2class = {}
         self.cname2inst = defaultdict(list)
+        self.classes = {}
         self.filepath = None
 
     def visit_ClassDef(self, node):
@@ -162,6 +206,8 @@ class BreakpointLocator(ast.NodeVisitor):
             mod = sys.modules[klass.__module__]
         except:
             print(f"skipping class {klass.__name__}. Can't find module.")
+
+        self.classes[klass.__name__] = klass
 
         self.process_file(mod.__file__)
 

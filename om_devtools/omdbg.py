@@ -22,7 +22,7 @@ class _DBGInput(object):
         else:
             inp = input('Enter a command: ')
             if not inp:
-                return 'n'
+                return 'p ""'
             return inp
 
 
@@ -42,14 +42,23 @@ class OMdbg(pdb.Pdb):
 
     # # ----- basic commands -----
     def do_bfunc(self, arg):
-        'Stop in a specific instance method'
+        'Stop in a specific instance or class method'
         self.brkmanager.bfunc(arg)
         return True
 
-    def do_dumpf(self, arg):
+    def do_fdump(self, arg):
         'Dump known functions'
-        self.brkmanager.dumpf(arg)
+        self.brkmanager.fdump(arg)
         return True
+
+    def do_idump(self, arg):
+        'Dump known instances'
+        self.brkmanager.idump(arg)
+        return True
+
+    def do_quit(self, arg):
+        print("QUIT!!!")
+        return False
 
     def message(self, msg):
         print(msg, file=self.stdout)
