@@ -58,7 +58,7 @@ class OMdbg(pdb.Pdb):
 
     def do_quit(self, arg):
         print("QUIT!!!")
-        return False
+        sys.exit(0)
 
     def message(self, msg):
         print(msg, file=self.stdout)
