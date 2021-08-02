@@ -18,7 +18,7 @@ except ImportError:
         pass
 
 
-def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout):
+def dump_dist_idxs(problem, full=False, stream=sys.stdout):
     """
     Print out the distributed idxs for each variable in input and output vecs.
 
@@ -40,8 +40,6 @@ def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout)
     ----------
     problem : <Problem>
         The problem object that contains the model.
-    vec_name : str
-        Name of vector to dump (when there are multiple vectors due to parallel derivs)
     full : bool
         If True, include data for all indices instead of just offsets.
     stream : File-like
@@ -49,27 +47,27 @@ def dump_dist_idxs(problem, vec_name='nonlinear', full=False, stream=sys.stdout)
     """
     def _get_data(g, type_):
 
-        sizes = g._var_sizes[vec_name]
-        vnames = g._var_allprocs_abs_names
-        abs2idx = g._var_allprocs_abs2idx[vec_name]
+        sizes = g._var_sizes
+        vmeta = g._var_allprocs_abs2meta
+        vmeta_loc = g._var_abs2meta
+        abs2idx = g._var_allprocs_abs2idx
 
         try:
-            if vec_name == 'nonlinear' and type_ == 'input' and g._inputs._nocopy:
-                nocopy = g._inputs._nocopy
-                osizes = g._var_sizes[vec_name]['output']
+            if type_ == 'input':
+                shares = g._inputs._shares_src_mem
             else:
-                nocopy = {}
+                shares = lambda x: False
         except AttributeError:
-            nocopy = {}
+            shares = lambda x: False
 
         data = []
         nwid = 0
         iwid = 0
         total = 0
         for rank in range(g.comm.size):
-            for ivar, vname in enumerate(vnames[type_]):
-                if vname in nocopy:
-                    sz = osizes[rank, abs2idx[nocopy[vname][0]]]
+            for ivar, vname in enumerate(vmeta[type_]):
+                if shares(vname):
+                    sz = vmeta_loc['input'][vname]['size'] if vname in vmeta_loc['input'] else 0
                     suffix = '*'
                 else:
                     sz = sizes[type_][rank, ivar]
@@ -118,8 +116,6 @@ def _dist_idxs_setup_parser(parser):
         'file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default=None, action='store', dest='outfile',
                         help='Name of output file.  By default, output goes to stdout.')
-    parser.add_argument('-v', '--vecname', action='store', default='nonlinear', dest='vecname',
-                        help='Name of vectors to show indices for.  Default is "nonlinear".')
     parser.add_argument('-f', '--full', action='store_true', dest='full',
                         help="Show all indices instead of just offsets.")
 
@@ -141,7 +137,7 @@ def _dist_idxs_exec(options, user_args):
         out = open(options.outfile, 'w')
 
     def _dumpdist(prob):
-        dump_dist_idxs(prob, vec_name=options.vecname, full=options.full, stream=out)
+        dump_dist_idxs(prob, full=options.full, stream=out)
         exit()
 
     _register_hook('final_setup', 'Problem', post=_dumpdist)
