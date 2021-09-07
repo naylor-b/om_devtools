@@ -1,8 +1,8 @@
 import json
 import os
 import sys
-import argparse
 import subprocess
+import platform
 
 from openmdao.utils.file_utils import files_iter
 
@@ -80,8 +80,7 @@ def find_notebooks_iter(section=None, string=None):
     if string:
         filters.append(lambda dct: string_filter(dct, string))
 
-    dexcludes = ['.ipynb_checkpoints', '_*']
-    for f in files_iter(file_includes=['*.ipynb'], dir_excludes=dexcludes):
+    for f in files_iter(file_includes=['*.ipynb'], dir_excludes=['.ipynb_checkpoints', '_*']):
         if not filters or notebook_filter(f, filters):
             yield f
 
@@ -102,26 +101,25 @@ def pick_one(files):
         return files[response]
 
 
-def show_notebook_cmd():
-    """
-    Display a notebook given a keyword.
-    """
-    parser = argparse.ArgumentParser(description='Empty output cells, reset execution_count, and '
-                                     'remove empty cells of jupyter notebook(s).')
+def _show_notebook_setup_parser(parser):
     parser.add_argument('file', nargs='?', help='Look for notebook having the given base filename')
     parser.add_argument('--section', action='store', dest='section',
                         help='Look for notebook(s) having the given section string.')
     parser.add_argument('-s', '--string', action='store', dest='string',
                         help='Look for notebook(s) having the given string in a code or markdown '
                         'cell.')
-    args = parser.parse_args()
 
-    if args.file is None:
+
+def _show_notebook_exec(options, user_args):
+    """
+    Display a notebook given a keyword.
+    """
+    if options.file is None:
         fname = None
-    elif args.file.endswith('.ipynb'):
-        fname = args.file
+    elif options.file.endswith('.ipynb'):
+        fname = options.file
     else:
-        fname = args.file + '.ipynb'
+        fname = options.file + '.ipynb'
 
     if fname is not None:
         files = [f for f in find_notebooks_iter() if os.path.basename(f) == fname]
@@ -129,7 +127,7 @@ def show_notebook_cmd():
             print(f"Can't find file {fname}.")
             sys.exit(-1)
     else:
-        files = list(find_notebooks_iter(section=args.section, string=args.string))
+        files = list(find_notebooks_iter(section=options.section, string=options.string))
         if not files:
             print(f"No matching notebook files found.")
             sys.exit(-1)
@@ -147,7 +145,42 @@ def show_notebook(f, dct):
         if not os.path.isfile(pidfile):
             print("cluster isn't running...")
             sys.exit(-1)
+        else:
+            # try to see if PID is running
+            with open(pidfile, 'r') as f:
+                pid = int(f.read().strip())
+            try:
+                import psutil
+            except ImportError:
+                # the following doesn't work for Windows, so if Windows, just proceed and
+                # hope the process exists
+                if platform.system() == 'Windows':
+                    pass
+                else:
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        print("cluster isn't running...")
+                        sys.exit(-1)
+                    except PermissionError:
+                        pass
+            else:
+                if not psutil.pid_exists(pid):
+                    print("cluster isn't running...")
+                    sys.exit(-1)
+
     os.system(f"jupyter notebook {f}")
+
+
+def _show_notebook_setup():
+    """
+    A command to run the source cells from given notebook(s).
+    """
+    return (
+        _show_notebook_setup_parser,
+        _show_notebook_exec,
+        "Display a given ipython notebook."
+    )
 
 
 def notebook_src_cell_iter(fname):
