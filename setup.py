@@ -30,6 +30,7 @@ setup_args = {
             'memtop=om_devtools.memtop:_memtop_setup',
             'cprof=om_devtools.cprof:_cprof_setup',
             'statprof=om_devtools.statprof.viewstatprof:_statprof_setup',
+            'run_notebook=om_devtools.notebook_utils:_run_notebook_setup',
         ]
     },
     'license': 'Apache License, Version 2.0',
